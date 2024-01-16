@@ -387,7 +387,11 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, DirWrite, TagWr
 
   oc.opcode := Mux(req.fromB, Cat(ProbeAck(2,1), meta.dirty.asUInt), if (alwaysReleaseData) ReleaseData else Cat(Release(2, 1), meta.dirty.asUInt))
   oc.tag := meta.tag
-  oc.set := req.set
+//  oc.set := req.set
+  val hash_id = associativePolicy.get_func_id(meta.way)
+  val req_hash_set = associativePolicy.get_hashed_index(Map("tag" -> req.tag, "set" -> req.set))
+  val replace_release_set = associativePolicy.get_unhashed_index(Map("tag" -> meta.tag, "set" -> req_hash_set(hash_id)))
+  oc.set := Mux(req.fromB, req.set, replace_release_set(hash_id))
   oc.param := Mux(
     req.fromB,
     MuxLookup(
@@ -463,6 +467,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, DirWrite, TagWr
   ic.release := false.B
   ic.dirty := false.B // ignored
 
+  io.tasks.dir_write.bits.tag := req.tag
   io.tasks.dir_write.bits.set := req.set
   io.tasks.dir_write.bits.way := meta.way
   io.tasks.dir_write.bits.data := new_dir
@@ -584,6 +589,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, DirWrite, TagWr
   io.status.bits.tag := req.tag
   io.status.bits.way := meta.way
   io.status.bits.way_reg := meta_reg.way
+  io.status.bits.meta_valid := io.dirResult.valid || meta_valid
   io.status.bits.will_grant_data := false.B //req.fromA && od.opcode(0)
   io.status.bits.will_save_data := true.B
   io.status.bits.is_prefetch := req.isPrefetch.getOrElse(false.B)

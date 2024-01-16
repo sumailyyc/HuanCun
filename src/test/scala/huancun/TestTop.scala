@@ -227,7 +227,8 @@ class TestTop_L2L3()(implicit p: Parameters) extends LazyModule {
       prefetch = Some(huancun.prefetch.BOPParameters()),
       reqField = Seq(PreferCacheField()),
       echoField = Seq(DirtyField()),
-      respKey = Seq(IsHitKey)
+      respKey = Seq(IsHitKey),
+      associative = "set"
     )
   }))).node)
 
