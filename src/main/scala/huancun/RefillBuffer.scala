@@ -4,7 +4,7 @@ import org.chipsalliance.cde.config.Parameters
 import chisel3._
 import chisel3.util._
 
-class SourceDBufferRead(implicit p: Parameters) extends HuanCunBundle {
+class RefillBufferRead(implicit p: Parameters) extends HuanCunBundle {
   val valid = Input(Bool())
   val beat = Input(UInt(beatBits.W))
   val id = Input(UInt(bufIdxBits.W))
@@ -13,7 +13,7 @@ class SourceDBufferRead(implicit p: Parameters) extends HuanCunBundle {
   val last = Input(Bool())
 }
 
-class SinkDBufferWrite(implicit p: Parameters) extends HuanCunBundle {
+class RefillBufferWrite(implicit p: Parameters) extends HuanCunBundle {
   val valid = Input(Bool())
   val beat = Input(UInt(beatBits.W))
   val data = Input(new DSData)
@@ -27,8 +27,9 @@ class SinkDBufferWrite(implicit p: Parameters) extends HuanCunBundle {
   */
 class RefillBuffer(implicit p: Parameters) extends HuanCunModule {
   val io = IO(new Bundle() {
-    val r = new SourceDBufferRead()
-    val w = new SinkDBufferWrite()
+    val sourceDRead = new RefillBufferRead()
+    val sinkDRead = new RefillBufferRead()
+    val sinkDWrite = new RefillBufferWrite()
   })
 
   val buffer = Mem(bufBlocks, Vec(beatSize, new DSData()))
@@ -36,21 +37,32 @@ class RefillBuffer(implicit p: Parameters) extends HuanCunModule {
     VecInit(Seq.fill(beatSize){false.B})
   }))
 
-  val (r, w) = (io.r, io.w)
-  val rlast = r.last
+  val (r1, r2, w) = (io.sourceDRead, io.sinkDRead, io.sinkDWrite)
+  val rlast1 = r1.last
+  val rlast2 = r2.last
   val wlast = w.beat.andR
   val wfirst = w.beat === 0.U
 
-  r.buffer_data := buffer(r.id)(r.beat)
-  r.ready := valids(r.id)(r.beat)
+  r1.buffer_data := buffer(r1.id)(r1.beat)
+  r1.ready := valids(r1.id)(r1.beat)
+  r2.buffer_data := buffer(r2.id)(r2.beat)
+  r2.ready := valids(r2.id)(r2.beat)
 
-  when(r.valid && r.beat === 0.U){
-    assert(r.ready, "[%d] first beat must hit!", r.id)
+  when(r1.valid && r1.beat === 0.U){
+    assert(r1.ready, "[%d] first beat must hit!", r1.id)
   }
 
-  when(r.valid && r.ready && rlast){ // last beat
+  when(r2.valid && r2.beat === 0.U){
+    assert(r2.ready, "[%d] first beat must hit!", r2.id)
+  }
+
+  when(r1.valid && r1.ready && rlast1){ // last beat
     // assert(valids(r.id).asUInt.andR, "[%d] attempt to invalidate a invalid entry", r.id)
-    valids(r.id).foreach(_ := false.B)
+    valids(r1.id).foreach(_ := false.B)
+  }
+
+  when(r2.valid && r2.ready && rlast2){
+    valids(r2.id).foreach(_ := false.B)
   }
 
   val validMask = VecInit(valids.map(vec => vec.asUInt.orR)).asUInt

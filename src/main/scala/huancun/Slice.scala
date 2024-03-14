@@ -77,8 +77,9 @@ class Slice()(implicit p: Parameters) extends HuanCunModule {
 
   val refillBuffer = Module(new RefillBuffer)
 
-  refillBuffer.io.r <> sourceD.io.bypass_read
-  refillBuffer.io.w <> sinkD.io.bypass_write
+  refillBuffer.io.sourceDRead <> sourceD.io.bypass_read
+  refillBuffer.io.sinkDRead <> sinkD.io.bypass_read
+  refillBuffer.io.sinkDWrite <> sinkD.io.bypass_write
 
   val outBuf = cacheParams.outerBuf
   io.out.a <> outBuf.a(sourceA.io.a)
@@ -479,6 +480,7 @@ class Slice()(implicit p: Parameters) extends HuanCunModule {
   arbTasks(sourceE.io.task, ms.map(_.io.tasks.source_e), Some("sourceE"), latch=true)
   arbTasks(sinkA.io.task, ms.map(_.io.tasks.sink_a), Some("sinkA"), latch=true)
   arbTasks(sinkC.io.task, ms.map(_.io.tasks.sink_c), Some("sinkC"), latch=true)
+  arbTasks(sinkD.io.task, ms.map(_.io.tasks.sink_d), Some("sinkD"), latch=true)
   arbTasks(
     Pipeline.pipeTo(directory.io.tagWReq),
     add_ctrl(ms.map(_.io.tasks.tag_write), ctrl.map(_.io.s_tag_w)),
@@ -582,11 +584,13 @@ class Slice()(implicit p: Parameters) extends HuanCunModule {
       mshr.io.resps.sink_e.valid := sinkE.io.resp.valid && sinkE.io.resp.bits.sink === i.U
       mshr.io.resps.source_d.valid := sourceD.io.resp.valid && sourceD.io.resp.bits.sink === i.U
       mshr.io.resps.sink_c_ack.valid := sinkC.io.taskack.valid && sinkC.io.taskack.bits.sink === i.U
+      mshr.io.resps.sink_d_ack.valid := sinkD.io.taskack.valid && sinkD.io.taskack.bits.sink === i.U
       mshr.io.resps.sink_c.bits := sinkC.io.resp.bits
       mshr.io.resps.sink_d.bits := sinkD.io.resp.bits
       mshr.io.resps.sink_e.bits := sinkE.io.resp.bits
       mshr.io.resps.source_d.bits := sourceD.io.resp.bits
       mshr.io.resps.sink_c_ack.bits := sinkC.io.taskack.bits
+      mshr.io.resps.sink_d_ack.bits := sinkD.io.taskack.bits
   }
   c_mshr.io.resps.sink_c.valid := false.B
 

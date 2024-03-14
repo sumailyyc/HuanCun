@@ -64,11 +64,22 @@ class SourceDReq(implicit p: Parameters) extends InnerTask with HasChannelBits {
   val off = UInt(offsetBits.W)
   val useBypass = Bool()
   val bufIdx = UInt(bufIdxBits.W)
+  val cleanBuf = Bool()
   val denied = Bool()
   val sinkId = UInt(mshrBits.W)
   val bypassPut = Bool()
   val dirty = Bool()
   val isHit = Bool()
+}
+
+class SinkDReq(implicit p: Parameters) extends HuanCunBundle {
+  val tag = UInt(tagBits.W)
+  val set = UInt(setBits.W)
+  val way = UInt(wayBits.W)
+  val bufIdx = UInt(bufIdxBits.W)
+  val source = UInt(mshrBits.W)
+  val save = Bool()
+  val cleanBuf = Bool()
 }
 
 class SourceAReq(implicit p: Parameters) extends HuanCunBundle {
@@ -129,6 +140,10 @@ class SourceDResp(implicit p: Parameters) extends HuanCunBundle {
 }
 
 class SinkCAck(implicit p: Parameters) extends HuanCunBundle {
+  val sink = UInt(mshrBits.W)
+}
+
+class SinkDAck(implicit p: Parameters) extends HuanCunBundle {
   val sink = UInt(mshrBits.W)
 }
 

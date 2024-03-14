@@ -541,6 +541,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   val s_transferput = RegInit(true.B) // writeput to source_a
   val s_writerelease = RegInit(true.B) // sink_c
   val s_writeprobe = RegInit(true.B)
+  val s_writegrant = RegInit(true.B)
   val s_triggerprefetch = prefetchOpt.map(_ => RegInit(true.B))
   val s_prefetchack = prefetchOpt.map(_ => RegInit(true.B))
 
@@ -554,6 +555,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   val w_grantack = RegInit(true.B)
   val w_putwritten = RegInit(true.B)
   val w_sinkcack = RegInit(true.B)
+  val w_grantwrite = RegInit(true.B)
 
   val acquire_flag = RegInit(false.B)
 
@@ -572,6 +574,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
     s_transferput := true.B
     s_writerelease := true.B
     s_writeprobe := true.B
+    s_writegrant := true.B
     s_triggerprefetch.foreach(_ := true.B)
     s_prefetchack.foreach(_ := true.B)
 
@@ -585,6 +588,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
     w_grantack := true.B
     w_putwritten := true.B
     w_sinkcack := true.B
+    w_grantwrite := true.B
 
     promoteT_safe := true.B
     gotT := false.B
@@ -926,7 +930,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
     }
   }
 
-  val no_wait = w_probeacklast && w_grantlast && w_releaseack && w_grantack && w_putwritten && w_sinkcack
+  val no_wait = w_probeacklast && w_grantlast && w_releaseack && w_grantack && w_putwritten && w_sinkcack && w_grantwrite
 
   val clients_meta_busy = Cat(clients_meta.map(s => !s.hit && s.state =/= INVALID)).orR
   val client_dir_conflict = RegEnable(
@@ -958,6 +962,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   // io.tasks.sink_a.valid := !s_writeput && w_grant && s_writeprobe && w_probeacklast
   io.tasks.sink_a.valid := false.B
   io.tasks.sink_c.valid := io.enable && ((!s_writerelease && (!releaseSave || s_release)) || (!s_writeprobe))
+  io.tasks.sink_d.valid := io.enable && !s_writegrant && s_execute
   io.tasks.prefetch_train.foreach(_.valid := !s_triggerprefetch.get)
   io.tasks.prefetch_resp.foreach(_.valid := !s_prefetchack.get && w_grantfirst)
 
@@ -968,6 +973,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   val oe = io.tasks.source_e.bits
   val ia = io.tasks.sink_a.bits
   val ic = io.tasks.sink_c.bits
+  val id = io.tasks.sink_d.bits
 
   // if we think a client is T,
   // but client acquire NtoB/NtoT/BtoT
@@ -1182,6 +1188,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   od.isHit := self_meta.hit
   od.bufIdx := req.bufIdx
   od.bypassPut := bypassPut_latch
+  od.cleanBuf := s_writegrant
 
   oe.sink := sink
 
@@ -1226,6 +1233,14 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
     req.dirty || self_meta.hit && self_meta.dirty,
     probe_dirty || self_meta.hit && self_meta.dirty
   )
+
+  id.tag := req.tag
+  id.set := req.set
+  id.way := self_meta.way
+  id.bufIdx := req.bufIdx
+  id.source := io.id
+  id.save := true.B
+  id.cleanBuf := true.B
 
   io.tasks.dir_write.bits.tag := req.tag
   io.tasks.dir_write.bits.set := req.set
@@ -1296,6 +1311,9 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
     }.otherwise {
       s_writerelease := true.B
     }
+  }
+  when(io.tasks.sink_d.fire) {
+    s_writegrant := true.B
   }
   if (prefetchOpt.nonEmpty) {
     when(io.tasks.prefetch_train.get.fire) {
@@ -1401,6 +1419,10 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
       when (!req_put) {
         req.bufIdx := io.resps.sink_d.bits.bufIdx
       }
+      when (io.resps.sink_d.bits.opcode(0) && io.status.bits.will_save_data) {
+        s_writegrant := false.B
+        w_grantwrite := false.B
+      }
     }
     when(io.resps.sink_d.bits.opcode === ReleaseAck) {
       w_releaseack := true.B
@@ -1419,13 +1441,17 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
     w_sinkcack := true.B
   }
 
+  when(io.resps.sink_d_ack.valid) {
+    w_grantwrite := true.B
+  }
+
   // Release MSHR
   val no_schedule = s_probeack && s_execute && s_grantack &&
     RegNext(s_wbselfdir && s_wbselftag && s_wbclientsdir && s_wbclientstag && meta_valid, true.B) &&
     s_writerelease && s_writeprobe &&
     s_triggerprefetch.getOrElse(true.B) &&
     s_prefetchack.getOrElse(true.B) &&
-    s_transferput
+    s_transferput && s_writegrant
   will_be_free := no_wait && no_schedule
   when(will_be_free) {
     meta_valid := false.B
@@ -1490,7 +1516,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   io.status.bits.way := self_meta.way
   io.status.bits.way_reg := meta_reg.self.way  // used to ease timing issue
   io.status.bits.meta_valid := io.dirResult.valid || meta_valid
-  io.status.bits.will_grant_data := req.fromA && od.opcode(0) && io.tasks.source_d.bits.useBypass
+  io.status.bits.will_grant_data := req.fromA && od.opcode(0) && od.useBypass
   io.status.bits.will_save_data := req.fromA && (preferCache_latch || self_meta.hit) && !acquirePermMiss
   io.status.bits.is_prefetch := req.isPrefetch.getOrElse(false.B)
   io.status.bits.blockB := true.B
@@ -1500,7 +1526,7 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   // if we are waitting for probeack,
   // we should not let B req in (avoid multi-probe to client)
   io.status.bits.nestB := meta_valid &&
-    (w_releaseack && w_probeacklast) && s_writeprobe && w_sinkcack &&
+    w_releaseack && w_probeacklast && s_writeprobe && w_sinkcack &&
     (!w_grantfirst || (client_dir_conflict && !probe_helper_finish) || !io.enable)
   io.status.bits.blockC := true.B
   // C nest B | C nest A

@@ -12,6 +12,7 @@ abstract class MSHRTasks[T_DIR_W <: BaseDirWrite, T_TAG_W <: BaseTagWrite](impli
   val source_b = DecoupledIO(new SourceBReq) // probe
   val sink_c = DecoupledIO(new SinkCReq) // inner release
   val source_d = DecoupledIO(new SourceDReq) // grant & atomics
+  val sink_d = DecoupledIO(new SinkDReq)
   // outer
   val source_a = DecoupledIO(new SourceAReq) // acquire
   val source_c = DecoupledIO(new SourceCReq) // outer release & probe ack
@@ -30,6 +31,7 @@ class MSHRResps(implicit p: Parameters) extends HuanCunBundle {
   val sink_e = ValidIO(new SinkEResp)
   val source_d = ValidIO(new SourceDResp)
   val sink_c_ack = ValidIO(new SinkCAck)
+  val sink_d_ack = ValidIO(new SinkDAck)
 }
 
 class NestedWriteback(implicit p: Parameters) extends HuanCunBundle {
