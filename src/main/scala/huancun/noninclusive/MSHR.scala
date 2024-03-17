@@ -950,10 +950,10 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   }
 
   val can_start = Mux(client_dir_conflict, probe_helper_finish, true.B)
-  io.tasks.source_a.valid := io.enable && (!s_acquire || !s_transferput) && s_release && s_probe && w_probeacklast && can_start
-  io.tasks.source_b.valid := io.enable && !s_probe && s_release
-  io.tasks.source_c.valid := io.enable && (!s_release || !s_probeack && s_writerelease && w_sinkcack && w_probeack)
-  io.tasks.source_d.valid := io.enable && !s_execute && can_start && w_grant && s_writeprobe && w_sinkcack && w_probeacklast && s_transferput // TODO: is there dependency between s_writeprobe and w_probeack?
+  io.tasks.source_a.valid := io.enable && (!s_acquire || !s_transferput) && s_probe && w_probeacklast && can_start
+  io.tasks.source_b.valid := io.enable && !s_probe
+  io.tasks.source_c.valid := io.enable && (!s_release && s_acquire && w_grantlast && s_probe && w_probeacklast || !s_probeack && s_writerelease && w_sinkcack && w_probeack)
+  io.tasks.source_d.valid := io.enable && !s_execute && can_start && w_grant && s_writeprobe && w_sinkcack && w_probeacklast && s_transferput && s_release // TODO: is there dependency between s_writeprobe and w_probeack?
   io.tasks.source_e.valid := !s_grantack && w_grantfirst
   io.tasks.dir_write.valid := io.enable && !s_wbselfdir && no_wait && can_start
   io.tasks.tag_write.valid := io.enable && !s_wbselftag && no_wait && can_start
@@ -961,8 +961,8 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   io.tasks.client_tag_write.valid := io.enable && !s_wbclientstag && no_wait && can_start
   // io.tasks.sink_a.valid := !s_writeput && w_grant && s_writeprobe && w_probeacklast
   io.tasks.sink_a.valid := false.B
-  io.tasks.sink_c.valid := io.enable && ((!s_writerelease && (!releaseSave || s_release)) || (!s_writeprobe))
-  io.tasks.sink_d.valid := io.enable && !s_writegrant && s_execute
+  io.tasks.sink_c.valid := io.enable && ((!s_writerelease && (!releaseSave || s_release)) || (!s_writeprobe && s_release))
+  io.tasks.sink_d.valid := io.enable && !s_writegrant && s_execute && s_release
   io.tasks.prefetch_train.foreach(_.valid := !s_triggerprefetch.get)
   io.tasks.prefetch_resp.foreach(_.valid := !s_prefetchack.get && w_grantfirst)
 
@@ -1526,12 +1526,11 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   // if we are waitting for probeack,
   // we should not let B req in (avoid multi-probe to client)
   io.status.bits.nestB := meta_valid &&
-    w_releaseack && w_probeacklast && s_writeprobe && w_sinkcack &&
+    w_probeacklast && s_writeprobe && w_sinkcack &&
     (!w_grantfirst || (client_dir_conflict && !probe_helper_finish) || !io.enable)
   io.status.bits.blockC := true.B
   // C nest B | C nest A
   io.status.bits.nestC := meta_valid &&
-    w_releaseack &&
     (
       !w_probeackfirst || !w_grantfirst || (client_dir_conflict && !probe_helper_finish) || !io.enable
     )

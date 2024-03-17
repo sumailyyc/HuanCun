@@ -89,7 +89,7 @@ case class HCCacheParameters
   blockBytes: Int = 64,
   pageBytes: Int = 4096,
   replacement: String = "plru",
-  associative: String = "skew",
+  associative: String = "set",
   hashGranularity: Int = 4,
   mshrs: Int = 14,
   dirReadPorts: Int = 1,

@@ -228,7 +228,6 @@ class TestTop_L2L3()(implicit p: Parameters) extends LazyModule {
       reqField = Seq(PreferCacheField()),
       echoField = Seq(DirtyField()),
       respKey = Seq(IsHitKey),
-      associative = "set"
     )
   }))).node)
 
