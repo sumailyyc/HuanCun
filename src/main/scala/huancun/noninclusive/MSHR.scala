@@ -1243,11 +1243,11 @@ class MSHR()(implicit p: Parameters) extends BaseMSHR[DirResult, SelfDirWrite, S
   id.cleanBuf := true.B
 
   io.tasks.dir_write.bits.tag := req.tag
-  io.tasks.dir_write.bits.set := req.set
+  io.tasks.dir_write.bits.set := req_hash_set(associativePolicy.get_func_id(meta_reg.self.way))
   io.tasks.dir_write.bits.way := meta_reg.self.way
   io.tasks.dir_write.bits.data := new_self_dir
 
-  io.tasks.tag_write.bits.set := req.set
+  io.tasks.tag_write.bits.set := req_hash_set(associativePolicy.get_func_id(meta_reg.self.way))
   io.tasks.tag_write.bits.way := meta_reg.self.way
   io.tasks.tag_write.bits.tag := req.tag
 

@@ -308,14 +308,12 @@ class Directory(implicit p: Parameters)
 
   // Self Dir Write
   selfDir.io.dir_w.valid := io.dirWReq.valid
-  selfDir.io.dir_w.bits.tag := io.dirWReq.bits.tag
   selfDir.io.dir_w.bits.set := io.dirWReq.bits.set
   selfDir.io.dir_w.bits.way := io.dirWReq.bits.way
   selfDir.io.dir_w.bits.dir := io.dirWReq.bits.data
   io.dirWReq.ready := selfDir.io.dir_w.ready && readyMask
   // Clients Dir Write
   clientDir.io.dir_w.valid := io.clientDirWReq.valid
-  clientDir.io.dir_w.bits.tag := io.clientDirWReq.bits.tag
   clientDir.io.dir_w.bits.set := io.clientDirWReq.bits.set
   clientDir.io.dir_w.bits.way := io.clientDirWReq.bits.way
   clientDir.io.dir_w.bits.dir := io.clientDirWReq.bits.data

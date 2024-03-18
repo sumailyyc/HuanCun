@@ -76,10 +76,6 @@ class MSHRAlloc(implicit p: Parameters) extends HuanCunModule {
 //  val b_block_vec = get_match_vec(io.b_req.bits, block_granularity)
 //  val a_block_vec = get_match_vec(io.a_req.bits, block_granularity)
 
-//  val c_match_vec = get_match_vec(io.c_req.bits, block_granularity)
-//  val b_match_vec = get_match_vec(io.b_req.bits, block_granularity)
-//  val a_match_vec = get_match_vec(io.a_req.bits, block_granularity)
-
   val c_set_match_vec = get_match_vec(io.c_req.bits, block_granularity)
   val b_set_match_vec = get_match_vec(io.b_req.bits, block_granularity)
   val a_set_match_vec = get_match_vec(io.a_req.bits, block_granularity)
@@ -134,10 +130,8 @@ class MSHRAlloc(implicit p: Parameters) extends HuanCunModule {
   val may_nestB_vec = VecInit((b_match_vec zip nestB_vec).map{ case (i, j) => i && j })
 
   val double_nest = Cat(c_match_vec.init.init).orR && c_match_vec.init.last
-//  val may_nestC = (c_match_vec.asUInt & nestC_vec.asUInt).orR && !(double_nest && !bc_mshr_status.bits.nestC)
   val may_nestC = (PopCount(c_match_vec) === PopCount(may_nestC_vec)) && may_nestC_vec.asUInt.orR &&
                   !(double_nest && !bc_mshr_status.bits.nestC)
-//  val may_nestB = (b_match_vec.asUInt & nestB_vec.asUInt).orR
   val may_nestB = (PopCount(b_match_vec) === PopCount(may_nestB_vec)) && may_nestB_vec.asUInt.orR
 
   val abc_mshr_alloc = io.alloc.init.init
@@ -150,7 +144,6 @@ class MSHRAlloc(implicit p: Parameters) extends HuanCunModule {
   val dirRead = io.dirRead
   val mshrFree = Cat(abc_mshr_status.map(s => !s.valid)).orR
 
-  //val can_accept_c = (mshrFree && !conflict_c) || nestC
   val can_accept_c = (!conflict_c && (mshrFree || !c_mshr_status.valid)) || nestC
   val accept_c = io.c_req.valid && can_accept_c
 
@@ -196,10 +189,8 @@ class MSHRAlloc(implicit p: Parameters) extends HuanCunModule {
   c_mshr_alloc.bits := io.c_req.bits
 
   io.bc_mask.valid := bc_mshr_alloc.valid
-//  io.bc_mask.bits := b_match_vec
   io.bc_mask.bits := may_nestB_vec
   io.c_mask.valid := c_mshr_alloc.valid
-//  io.c_mask.bits := c_match_vec
   io.c_mask.bits := may_nestC_vec
 
   dirRead.valid := request.valid && Cat(accept_c, accept_b, accept_a).orR && dirRead.ready
