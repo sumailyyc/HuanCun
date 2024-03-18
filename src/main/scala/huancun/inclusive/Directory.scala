@@ -103,7 +103,6 @@ class Directory(implicit p: Parameters) extends BaseDirectory[DirResult, DirWrit
   io.tagWReq.ready := dir.io.tag_w.ready
   // Self Dir Write
   dir.io.dir_w.valid := io.dirWReq.valid
-  dir.io.dir_w.bits.tag := io.dirWReq.bits.tag
   dir.io.dir_w.bits.set := io.dirWReq.bits.set
   dir.io.dir_w.bits.way := io.dirWReq.bits.way
   dir.io.dir_w.bits.dir := io.dirWReq.bits.data
