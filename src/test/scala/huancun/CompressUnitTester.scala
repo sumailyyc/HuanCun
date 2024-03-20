@@ -233,40 +233,123 @@ class CompressUnitTester extends L2Tester with UseVerilatorBackend with DumpVCD 
     }
     .head
 
+  def Poke(data: String, first: Boolean, valid: Boolean)(implicit dut: CompressUnit) = {
+    dut.io.in.bits.data.poke(s"b$data".U)
+    dut.io.in.bits.isFirstBeat.poke(first.B)
+    dut.io.in.valid.poke(valid.B)
+  }
+  def PokeFirst(data: String)(implicit dut: CompressUnit) = Poke(data, true, true)
+  def PokeLast(data: String)(implicit dut: CompressUnit) = Poke(data, false, true)
+  def dataPoke(data:            String)(implicit dut:  CompressUnit) = dut.io.in.bits.data.poke(s"b$data".U)
+  def firstBeatPoke(first:      Boolean)(implicit dut: CompressUnit) = dut.io.in.bits.isFirstBeat.poke(first.B)
+  def inValidPoke(valid:        Boolean)(implicit dut: CompressUnit) = dut.io.in.valid.poke(valid.B)
+  def inReadyPeek(implicit dut: CompressUnit) = dut.io.in.ready.peek()
+
+  def dataPeek(implicit dut:         CompressUnit) = dut.io.out.bits.data.peek()
+  def compressiblePeek(implicit dut: CompressUnit) = dut.io.out.bits.compressible.peek()
+  def outValidPeek(implicit dut:     CompressUnit) = dut.io.out.valid.peek()
+  def outReadyPoke(ready:            Boolean)(implicit dut: CompressUnit) = dut.io.out.ready.poke(ready.B)
+
+  def Expect(data: String, valid: Boolean, compressible: Boolean)(implicit dut: CompressUnit) = {
+    dut.io.out.bits.data.expect(s"b$data".U)
+    dut.io.out.valid.expect(valid.B)
+    dut.io.out.bits.compressible.expect(compressible.B)
+  }
+  def dataExpect(data:      String)(implicit dut:  CompressUnit) = dut.io.out.bits.data.expect(s"b$data".U)
+  def compressibleExpect(b: Boolean)(implicit dut: CompressUnit) = dut.io.out.bits.compressible.expect(b.B)
+  def outValidExpect(b:     Boolean)(implicit dut: CompressUnit) = dut.io.out.valid.expect(b.B)
+  def inReadyExpect(b:      Boolean)(implicit dut: CompressUnit) = dut.io.in.ready.expect(b.B)
+
   it should "do something" in {
-    test(new CompressUnit(true)(compressUnit.p)).withAnnotations(testAnnos) { dut =>
-      dut.clock.setTimeout(2000000)
+    test(new CompressUnit(true)(compressUnit.p)).withAnnotations(testAnnos) { d =>
+      implicit val dut = d
+      dut.clock.setTimeout(200000)
       println("hello")
+      // init
       dut.clock.step(1)
-      dut.io.begin.poke(false.B)
+      dut.io.in.valid.poke(false.B)
       dut.clock.step(1)
       // val dataSeq = Seq("12121212", "12345678", "fff7fff8", "12340000", "00007fff", "0000007f", "00000007", "00000000")
       // val data1 = BigInt(dataSeq.reduce(_ + _), 16)
       // val data2 = BigInt(dataSeq.reverse.reduce(_ + _), 16)
-      for (i <- 0 until 1000) {
-        dut.io.begin.poke(false.B)
+
+      // test correction of compress
+      dut.io.out.ready.poke(true.B)
+      for (i <- 0 until 3) {
+        dut.io.in.valid.poke(false.B)
         dut.clock.step(1)
         println(i)
         val (data1, data2, dataOut, compressible) = Generater.genFullNum
-        dut.io.begin.poke(true.B)
-        dut.io.dataIn.poke(s"b${data1}".U)
+        PokeFirst(data1)
         dut.clock.step(1)
-        dut.io.begin.poke(false.B)
-        dut.io.dataIn.poke(s"b${data2}".U)
-        while (dut.io.finish.peek.litToBoolean != true) {
+        PokeLast(data2)
+        dut.clock.step(1)
+        dut.io.in.valid.poke(false.B)
+        while (dut.io.out.valid.peek.litToBoolean != true) {
           dut.clock.step(1)
         }
-        // println("data1: " + s"b${data1}".U.litValue.toString(16))
-        // println("data2: " + s"b${data2}".U.litValue.toString(16))
-        // println("dut: " + dut.io.dataOut.peek().litValue.toString(16))
-        // println("ref: " + s"b${dataOut}".U.litValue.toString(16))
-        // println()
-        dut.io.compressible.expect(compressible.B)
+        println("data1: " + s"b${data1}".U.litValue.toString(16))
+        println("data2: " + s"b${data2}".U.litValue.toString(16))
+        println("dut: " + dut.io.out.bits.data.peek().litValue.toString(16))
+        println("ref: " + s"b${dataOut}".U.litValue.toString(16))
+        println()
+        dut.io.out.bits.compressible.expect(compressible.B)
         if (compressible) {
-          dut.io.dataOut.expect(s"b${dataOut}".U)
+          dut.io.out.bits.data.expect(s"b${dataOut}".U)
         }
         dut.clock.step(1)
       }
+
+      // test the pipeline
+      // when agent isn't ready
+      var dat: String = "0"
+
+      {
+        val (data1, data2, dataOut, compressible) = Generater.genFullNum
+        PokeFirst(data1)
+        outReadyPoke(false)
+        dut.clock.step()
+        PokeLast(data2)
+        while (dut.io.out.valid.peek.litToBoolean != true) {
+          dut.clock.step(1)
+          inValidPoke(false)
+        }
+        if (compressible) {
+          dataExpect(dataOut)
+        }
+        dat = dataOut
+        inReadyExpect(true)
+
+        val (data3, data4, dataOut3, compressible3) = Generater.genFullNum
+        PokeFirst(data3)
+        dut.clock.step()
+        PokeLast(data4)
+        while (dut.io.out.valid.peek.litToBoolean != true) {
+          dut.clock.step(1)
+          inValidPoke(false)
+        }
+        if (compressible) {
+          dataExpect(dataOut)
+        }
+        inReadyExpect(true)
+
+        val (data5, data6, dataOut5, compressible5) = Generater.genFullNum
+        PokeFirst(data5)
+        dut.clock.step()
+        PokeLast(data6)
+        dut.clock.step(1)
+        inValidPoke(false)
+        dut.clock.step(2)
+        if (compressible) {
+          dataExpect(dataOut)
+        }
+        inReadyExpect(false)
+
+        outReadyPoke(true)
+        dut.clock.step()
+        outValidExpect(false)
+      }
+
     }
   }
 

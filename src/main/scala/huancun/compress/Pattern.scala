@@ -13,7 +13,7 @@ trait CCParameters {
   val ccPrefixBits = 48
 }
 
-trait Pattern extends CCParameters {
+abstract class Pattern extends CCParameters {
   val width:    Int
   val prefix:   UInt
   val prefixOH: UInt
@@ -22,6 +22,7 @@ trait Pattern extends CCParameters {
   def detect(in: UInt): Bool
 
   def encode(in: UInt): UInt
+  def decode(in: UInt): UInt
 
   def detect_n_bit_signext(in: UInt)(signext_bit: Int) = {
     require(in.getWidth == ccEntryBits)
@@ -43,6 +44,10 @@ object ZeroRun extends Pattern {
     require(in.getWidth == ccEntryBits)
     "b0".U
   }
+
+  override def decode(in: UInt): UInt = {
+    0.U(ccEntryBits.W)
+  }
 }
 
 object FourbitSignExt extends Pattern {
@@ -55,6 +60,10 @@ object FourbitSignExt extends Pattern {
   override def encode(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
+  }
+
+  override def decode(in: UInt): UInt = {
+    Cat(Fill(ccEntryBits - width, in(width - 1)), in)
   }
 }
 
@@ -69,6 +78,10 @@ object OneByteSignExt extends Pattern {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
   }
+
+  override def decode(in: UInt): UInt = {
+    Cat(Fill(ccEntryBits - width, in(width - 1)), in)
+  }
 }
 
 object HalfWordSignExt extends Pattern {
@@ -81,6 +94,10 @@ object HalfWordSignExt extends Pattern {
   override def encode(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
+  }
+
+  override def decode(in: UInt): UInt = {
+    Cat(Fill(ccEntryBits - width, in(width - 1)), in)
   }
 }
 
@@ -99,12 +116,18 @@ object PadHalfZero extends Pattern {
     require(in.getWidth == ccEntryBits)
     in(ccEntryBits - 1, ccEntryBits / 2)
   }
+
+  override def decode(in: UInt): UInt = {
+    Cat(in, 0.U(width.W))
+  }
 }
 
 object TwoSignExt extends Pattern {
   override val width:    Int = ccEntryBits / 2
   override val prefix:   UInt = "b101".U
   override val prefixOH: UInt = "b00100000".U
+  private val halfEntryBits = ccEntryBits / 2
+  private val quater = ccEntryBits / 4
 
   override def detect(in: UInt): Bool = {
     require(in.getWidth == ccEntryBits)
@@ -116,9 +139,13 @@ object TwoSignExt extends Pattern {
 
   override def encode(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
-    val halfEntryBits = ccEntryBits / 2
-    val quater = ccEntryBits / 4
     Cat(in(halfEntryBits + quater - 1, halfEntryBits), in(quater - 1, 0))
+  }
+
+  override def decode(in: UInt): UInt = {
+    val num1 = Cat(Fill(quater, in(quater - 1)), in(quater - 1, 0))
+    val num2 = Cat(Fill(quater, in(quater + halfEntryBits - 1)), in(quater + halfEntryBits - 1, 0))
+    Cat(num2, num1)
   }
 }
 
@@ -127,9 +154,9 @@ object RepeatedBytes extends Pattern {
   override val prefix:   UInt = "b110".U
   override val prefixOH: UInt = "b01000000".U
 
+  private val repeat_num = ccEntryBits / width
   override def detect(in: UInt): Bool = {
     require(in.getWidth == ccEntryBits)
-    val repeat_num = ccEntryBits / 8
     val bytes = (0 until repeat_num).map(i => in(i * 8 + 7, i * 8))
     val first = bytes.head
     val remain = bytes.tail
@@ -139,6 +166,10 @@ object RepeatedBytes extends Pattern {
   override def encode(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
+  }
+
+  override def decode(in: UInt): UInt = {
+    Fill(repeat_num, in)
   }
 }
 
@@ -153,4 +184,6 @@ object UnCompressed extends Pattern {
     require(in.getWidth == ccEntryBits)
     in
   }
+
+  override def decode(in: UInt): UInt = in
 }
