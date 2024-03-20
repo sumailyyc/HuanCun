@@ -6,10 +6,9 @@ import huancun.{HuanCunBundle, HuanCunModule}
 import org.chipsalliance.cde.config.Parameters
 
 /** If dataIn isn't compressible, encode unit will not output the compressed value
-  * Notice that if isFirstBeat is true for two consecutive handshakes,
-  * the data from the next handshake will overwrite the data from the previous handshake.
-  * The same applies when isFirstBeat is false for two consecutive handshake.
-  * Data wil output after compress latency when isFirstBeat is false in a handshake
+  * Notice that you can't send two fristBeat
+  * You must send lastBeat after firstBeat
+  * 请务必传输两个完整的beat，第一个为first beat，第二个为last beat，通过isFirstBeat控制
   */
 class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanCunModule with CCParameters {
   // val io = IO(new HuanCunBundle() {
@@ -36,7 +35,6 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
     val out = DecoupledIO(new DataOut)
   })
 
-
   /** The order has been arranged according to the prefix */
   val patternSeq = Seq(
     ZeroRun,
@@ -60,8 +58,8 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
   }
   val s1 = RegInit(0.U.asTypeOf(new Stage1Bundle))
   val s1_valid = RegInit(false.B)
-  val s1_ready = RegInit(true.B)
-  
+  val s1_ready = WireInit(true.B)
+
   class Stage2Bundle extends Bundle {
     val first = Bool()
     val last = Bool()
@@ -73,7 +71,7 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
   }
   val s2 = RegInit(0.U.asTypeOf(new Stage2Bundle))
   val s2_valid = RegInit(false.B)
-  val s2_ready = RegInit(true.B)
+  val s2_ready = WireInit(true.B)
 
   class Stage3Bundle extends Bundle {
     val first = Bool()
@@ -84,7 +82,7 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
   }
   val s3 = RegInit(0.U.asTypeOf(new Stage3Bundle))
   val s3_valid = RegInit(false.B)
-  val s3_ready = RegInit(true.B)
+  val s3_ready = WireInit(true.B)
 
   dontTouch(s1_valid)
   dontTouch(s1_ready)
@@ -93,12 +91,9 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
   dontTouch(s3_valid)
   dontTouch(s3_ready)
 
-
   // stage 1: frequent pattern detect
   val ccEntry = VecInit(
-    (0 until entry_per_beat).map(i =>
-      Mux(io.in.fire, io.in.bits.data((i + 1) * ccEntryBits - 1, i * ccEntryBits), 0.U(ccEntryBits.W))
-    )
+    (0 until entry_per_beat).map(i => io.in.bits.data((i + 1) * ccEntryBits - 1, i * ccEntryBits))
   )
   val patternMatcher =
     VecInit(
@@ -107,15 +102,18 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
       )
     )
 
-  when (io.in.fire) {
+  when(s1_ready) {
+    s1_valid := io.in.valid
+  }
+  io.in.ready := s1_ready
+  s1_ready := s1_valid & s2_ready | ~s1_valid
+
+  when(io.in.fire) {
     s1.first := io.in.bits.isFirstBeat
     s1.last := ~io.in.bits.isFirstBeat
+    s1.prefixOH := patternMatcher
+    s1.data := ccEntry
   }
-  s1.prefixOH := patternMatcher
-  s1.data := ccEntry
-
-  io.in.ready := s1_ready
-  s1_ready := s2_ready | ~s1_valid
 
   // stage 2: zero run
   val entryWidth = s1.prefixOH.map(prefixOH =>
@@ -143,9 +141,10 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
   // }.elsewhen(s1_last) {
   //   s2_compressible := (s2_halfWid +& halfWidth) < (beatBytes * 8 - ccPrefixBits).U
   // }
-  s2_ready := s3_ready | ~s2_valid
-  s2_valid := s1_valid
-  dontTouch(s2.halfWid)
+  s2_ready := s2_valid & s3_ready | ~s2_valid
+  when(s2_ready) {
+    s2_valid := s1_valid
+  }
   when(s1_valid && s2_ready) {
     s2.first := s1.first
     s2.last := s1.last
@@ -194,7 +193,6 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
 
   val s3_canReceiveFirst = Mux(s3_valid, s3.last & io.out.ready, true.B)
   val s3_canReceiveLast = s3_valid & s3.first
-  s3_valid := s2_valid
   s3_ready := s3_canReceiveFirst | s3_canReceiveLast
 
   when(s2_valid && s2.first && s3_canReceiveFirst) {
@@ -205,7 +203,10 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
     s3.prefix := Cat(Cat(s2.prefixOH.reverse.map(prefixOH => OHToUInt(prefixOH))), s3.prefix(ccPrefixBits / 2 - 1, 0))
     s3.compressible := s2.compressible
   }
-  when (s2_valid && s3_ready) {
+  when(s3_ready) {
+    s3_valid := s2_valid
+  }
+  when(s2_valid && s3_ready) {
     s3.first := s2.first
     s3.last := s2.last
   }
