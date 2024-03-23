@@ -24,7 +24,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 import utility.MemReqSource
-import huancun.compress.CompressUnit
+import huancun.compress.{CompressUnit, DecompressUnit}
 
 class SinkA(implicit p: Parameters) extends HuanCunModule {
   val io = IO(new Bundle() {
@@ -45,6 +45,9 @@ class SinkA(implicit p: Parameters) extends HuanCunModule {
   val compress = Module(new CompressUnit)
   compress.io := DontCare
   dontTouch(compress.io)
+  val decompress = Module(new DecompressUnit)
+  decompress.io := DontCare
+  dontTouch(decompress.io)
 
   val a = io.a
   val (first, last, done, count) = edgeIn.count(a)

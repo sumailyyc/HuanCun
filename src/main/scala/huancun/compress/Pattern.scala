@@ -21,8 +21,8 @@ abstract class Pattern extends CCParameters {
   /** used to detect whether a UInt match the pattern */
   def detect(in: UInt): Bool
 
-  def encode(in: UInt): UInt
-  def decode(in: UInt): UInt
+  def compress(in: UInt): UInt
+  def decompress(in: UInt): UInt
 
   def detect_n_bit_signext(in: UInt)(signext_bit: Int) = {
     require(in.getWidth == ccEntryBits)
@@ -40,12 +40,12 @@ object ZeroRun extends Pattern {
     in === 0.U(ccEntryBits.W)
   }
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     "b0".U
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     0.U(ccEntryBits.W)
   }
 }
@@ -57,12 +57,12 @@ object FourbitSignExt extends Pattern {
 
   override def detect(in: UInt) = detect_n_bit_signext(in)(width)
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     Cat(Fill(ccEntryBits - width, in(width - 1)), in)
   }
 }
@@ -74,12 +74,12 @@ object OneByteSignExt extends Pattern {
 
   override def detect(in: UInt) = detect_n_bit_signext(in)(width)
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     Cat(Fill(ccEntryBits - width, in(width - 1)), in)
   }
 }
@@ -91,12 +91,12 @@ object HalfWordSignExt extends Pattern {
 
   override def detect(in: UInt) = detect_n_bit_signext(in)(width)
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     Cat(Fill(ccEntryBits - width, in(width - 1)), in)
   }
 }
@@ -112,12 +112,12 @@ object PadHalfZero extends Pattern {
     in(halfEntryBits - 1, 0) === 0.U(halfEntryBits.W)
   }
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(ccEntryBits - 1, ccEntryBits / 2)
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     Cat(in, 0.U(width.W))
   }
 }
@@ -137,12 +137,12 @@ object TwoSignExt extends Pattern {
     halfEntry.map(x => x(halfEntryBits - 1, quater) === Fill(quater, x(quater - 1))).reduce(_ & _)
   }
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     Cat(in(halfEntryBits + quater - 1, halfEntryBits), in(quater - 1, 0))
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     val num1 = Cat(Fill(quater, in(quater - 1)), in(quater - 1, 0))
     val num2 = Cat(Fill(quater, in(quater + halfEntryBits - 1)), in(quater + halfEntryBits - 1, 0))
     Cat(num2, num1)
@@ -163,12 +163,12 @@ object RepeatedBytes extends Pattern {
     remain.map(_ === first).reduce(_ & _)
   }
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in(width - 1, 0)
   }
 
-  override def decode(in: UInt): UInt = {
+  override def decompress(in: UInt): UInt = {
     Fill(repeat_num, in)
   }
 }
@@ -180,10 +180,10 @@ object UnCompressed extends Pattern {
 
   override def detect(in: UInt): Bool = true.B
 
-  override def encode(in: UInt): UInt = {
+  override def compress(in: UInt): UInt = {
     require(in.getWidth == ccEntryBits)
     in
   }
 
-  override def decode(in: UInt): UInt = in
+  override def decompress(in: UInt): UInt = in
 }

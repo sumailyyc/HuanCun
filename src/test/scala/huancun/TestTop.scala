@@ -566,5 +566,8 @@ object TestTop_FullSys extends App {
 
 object TestTop_CC extends App {
   org.scalatest.run(new CompressUnitTester)
-  // Generater.check
+}
+
+object TestTop_DCC extends App {
+  org.scalatest.run(new DecompressUnitTester)
 }

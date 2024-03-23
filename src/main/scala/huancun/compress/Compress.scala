@@ -48,7 +48,8 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
   ).sortBy(_.prefix.litValue)
 
   val entry_per_beat = beatBytes * 8 / ccEntryBits // current value is 8
-  val offsetWidth = (log2Ceil(blockBytes * 8) + 1)
+  val CC_offsetWidth = (log2Ceil(blockBytes * 8) + 1)
+
 
   class Stage1Bundle extends Bundle {
     val first = Bool()
@@ -65,8 +66,8 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
     val last = Bool()
     val prefixOH = Vec(entry_per_beat, UInt(8.W))
     val data = Vec(entry_per_beat, UInt(ccEntryBits.W))
-    val entryOffset = Vec(entry_per_beat, UInt(offsetWidth.W))
-    val halfWid = UInt(offsetWidth.W)
+    val entryOffset = Vec(entry_per_beat, UInt(CC_offsetWidth.W))
+    val halfWid = UInt(CC_offsetWidth.W)
     val compressible = Bool()
   }
   val s2 = RegInit(0.U.asTypeOf(new Stage2Bundle))
@@ -93,7 +94,7 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
 
   // stage 1: frequent pattern detect
   val ccEntry = VecInit(
-    (0 until entry_per_beat).map(i => io.in.bits.data((i + 1) * ccEntryBits - 1, i * ccEntryBits))
+    Seq.tabulate(entry_per_beat)(i => io.in.bits.data((i + 1) * ccEntryBits - 1, i * ccEntryBits))
   )
   val patternMatcher =
     VecInit(
@@ -121,8 +122,8 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
       patternSeq.zipWithIndex.map { case (pat, i) => prefixOH(i) -> pat.width.U }
     )
   )
-  val entryOffset = Seq.fill(entry_per_beat)(Wire(UInt(offsetWidth.W)))
-  val halfWidth = entryWidth.zip(entryOffset).foldLeft(0.U(offsetWidth.W)) {
+  val entryOffset = Seq.fill(entry_per_beat)(Wire(UInt(CC_offsetWidth.W)))
+  val halfWidth = entryWidth.zip(entryOffset).foldLeft(0.U(CC_offsetWidth.W)) {
     case (sum, (width, offset)) =>
       offset := sum
       sum +& width
@@ -170,7 +171,7 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
     case (prefix, data) =>
       Mux1H {
         patternSeq.zipWithIndex.map {
-          case (pat, i) => prefix(i) -> pat.encode(data)
+          case (pat, i) => prefix(i) -> pat.compress(data)
         }
       }
   }
@@ -218,6 +219,4 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
 
 object CompressUnit {
   val latency = 3
-
-  def apply(in: UInt, first: Bool, last: Bool)(implicit p: Parameters) = {}
 }

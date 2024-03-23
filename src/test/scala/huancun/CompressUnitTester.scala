@@ -9,7 +9,7 @@ import firrtl.AnnotationSeq
 import firrtl.stage.RunFirrtlTransformAnnotation
 import org.scalatest.flatspec._
 import org.scalatest.matchers.should._
-import huancun.compress.CompressUnit
+import huancun.compress.{CompressUnit, DecompressUnit}
 import freechips.rocketchip.diplomacy.LazyModule
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse.File
 import scala.util.Random
@@ -373,7 +373,6 @@ object testCase {
         outValidExpect(true)
       }
 
-
       PokeFirst(data1)
       dut.clock.step(); inReadyExpect(true)
       PokeLast(data2)
@@ -456,5 +455,54 @@ class CompressUnitTester extends L2Tester with UseVerilatorBackend with DumpVCD 
       case2
     }
   }
+}
 
+class DecompressUnitTester extends L2Tester with UseVerilatorBackend with DumpVCD {
+  val system = LazyModule(new ExampleSystem())
+  chisel3.stage.ChiselStage.elaborate(system.module)
+
+  val decompressUnit = chisel3.aop.Select
+    .collectDeep[DecompressUnit](system.module) {
+      case decompressUnit: DecompressUnit =>
+        decompressUnit
+    }
+    .head
+
+  import testCase._
+  it should "do something" in {
+    test(new DecompressUnit()(decompressUnit.p)).withAnnotations(testAnnos) { d =>
+      implicit val dut = d
+      dut.clock.setTimeout(20000)
+      println("hello")
+      // init
+      dut.clock.step(1)
+      dut.io.in.valid.poke(false.B)
+      dut.io.out.ready.poke(true.B)
+      dut.clock.step(1)
+
+      for (i <- 0 until 1) {
+        val (data1, data2, dataOut, compressible) = Generater.genFullNum
+        if (compressible) {
+          dut.io.in.valid.poke(true.B)
+          dut.io.in.bits.data.poke(s"b$dataOut".U)
+          dut.io.in.bits.needFirstBeat.poke(true.B)
+          dut.clock.step()
+          dut.io.in.valid.poke(true.B)
+          dut.io.in.bits.data.poke(s"b$dataOut".U)
+          dut.io.in.bits.needFirstBeat.poke(false.B)
+          dut.clock.step()
+          dut.io.in.valid.poke(false.B)
+          dut.clock.step(2)
+          println("data1: " + s"b${data1}".U.litValue.toString(16))
+          println("data2: " + s"b${data2}".U.litValue.toString(16))
+          println("dut: " + dut.io.out.bits.beat.peek().litValue.toString(16))
+          // dut.io.out.bits.beat.expect(s"b$data1".U)
+          dut.clock.step()
+          println("dut: " + dut.io.out.bits.beat.peek().litValue.toString(16))
+          // dut.io.out.bits.beat.expect(s"b$data2".U)
+          println()
+        }
+      }
+    }
+  }
 }
