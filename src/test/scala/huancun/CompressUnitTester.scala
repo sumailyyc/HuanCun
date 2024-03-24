@@ -220,7 +220,7 @@ object Generater {
     val dataOut = compressed_data + data_prefix
     val totalWidth = a.map(_.width).reduce(_ + _) + b.map(_.width).reduce(_ + _) + 48
     println(s"totalwidth: ${totalWidth}")
-    val compressible = totalWidth < 256
+    val compressible = totalWidth <= 256
     (data1, data2, dataOut, compressible)
   }
 }
@@ -480,28 +480,87 @@ class DecompressUnitTester extends L2Tester with UseVerilatorBackend with DumpVC
       dut.io.out.ready.poke(true.B)
       dut.clock.step(1)
 
-      for (i <- 0 until 1) {
+      for (i <- 0 until 100000) {
         val (data1, data2, dataOut, compressible) = Generater.genFullNum
-        if (compressible) {
+        val (data3, data4, dataOut3, compressible3) = Generater.genFullNum
+        val (data5, data6, dataOut5, compressible5) = Generater.genFullNum
+        val (data7, data8, dataOut7, compressible7) = Generater.genFullNum
+        val (data9, data10, dataOut9, compressible9) = Generater.genFullNum
+        val (data11, data12, dataOut11, compressible11) = Generater.genFullNum
+        if (compressible && compressible3 && compressible5) {
           dut.io.in.valid.poke(true.B)
           dut.io.in.bits.data.poke(s"b$dataOut".U)
           dut.io.in.bits.needFirstBeat.poke(true.B)
           dut.clock.step()
-          dut.io.in.valid.poke(true.B)
           dut.io.in.bits.data.poke(s"b$dataOut".U)
           dut.io.in.bits.needFirstBeat.poke(false.B)
           dut.clock.step()
-          dut.io.in.valid.poke(false.B)
-          dut.clock.step(2)
-          println("data1: " + s"b${data1}".U.litValue.toString(16))
-          println("data2: " + s"b${data2}".U.litValue.toString(16))
-          println("dut: " + dut.io.out.bits.beat.peek().litValue.toString(16))
-          // dut.io.out.bits.beat.expect(s"b$data1".U)
+          dut.io.in.bits.data.poke(s"b$dataOut3".U)
+          dut.io.in.bits.needFirstBeat.poke(true.B)
           dut.clock.step()
-          println("dut: " + dut.io.out.bits.beat.peek().litValue.toString(16))
-          // dut.io.out.bits.beat.expect(s"b$data2".U)
-          println()
+          dut.io.in.bits.data.poke(s"b$dataOut3".U)
+          dut.io.in.bits.needFirstBeat.poke(false.B)
+          dut.clock.step()
+          dut.io.in.valid.poke(false.B)
+          println("data1: " + s"b$data1".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data1".U)
+          dut.clock.step()
+          println("data2: " + s"b$data2".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data2".U)
+          dut.clock.step()
+          println("data3: " + s"b$data3".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data3".U)
+          dut.clock.step()
+          println("data4: " + s"b$data4".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data4".U)
+          dut.clock.step()
+
+
+          dut.io.out.ready.poke(false.B)
+          dut.io.in.valid.poke(true.B)
+          dut.io.in.bits.data.poke(s"b$dataOut".U)
+          dut.io.in.bits.needFirstBeat.poke(true.B)
+          dut.clock.step()
+          dut.io.in.bits.data.poke(s"b$dataOut".U)
+          dut.io.in.bits.needFirstBeat.poke(false.B)
+          dut.clock.step()
+          dut.io.in.bits.data.poke(s"b$dataOut3".U)
+          dut.io.in.bits.needFirstBeat.poke(true.B)
+          dut.clock.step()
+          dut.io.in.bits.data.poke(s"b$dataOut3".U)
+          dut.io.in.bits.needFirstBeat.poke(false.B)
+          dut.clock.step()
+          dut.io.in.bits.data.poke(s"b$dataOut5".U)
+          dut.io.in.bits.needFirstBeat.poke(true.B)
+          dut.io.in.ready.expect(false.B)
+          dut.io.out.valid.expect(true.B)
+          dut.clock.step()
+          dut.io.in.bits.data.poke(s"b$dataOut5".U)
+          dut.io.in.bits.needFirstBeat.poke(false.B)
+          dut.clock.step()
+          dut.io.in.valid.poke(false.B)
+          dut.io.out.ready.poke(true.B)
+          println("data1: " + s"b$data1".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data1".U)
+          dut.clock.step()
+          println("data2: " + s"b$data2".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data2".U)
+          dut.clock.step()
+          println("data3: " + s"b$data3".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data3".U)
+          dut.clock.step()
+          println("data4: " + s"b$data4".U.litValue.toString(16))
+          println("dut:   " + dut.io.out.bits.beat.peek.litValue.toString(16))
+          dut.io.out.bits.beat.expect(s"b$data4".U)
         }
+        println()
       }
     }
   }

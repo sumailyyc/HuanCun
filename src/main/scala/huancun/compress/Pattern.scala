@@ -63,7 +63,7 @@ object FourbitSignExt extends Pattern {
   }
 
   override def decompress(in: UInt): UInt = {
-    Cat(Fill(ccEntryBits - width, in(width - 1)), in)
+    Cat(Fill(ccEntryBits - width, in(width - 1)), in(width - 1, 0))
   }
 }
 
@@ -80,7 +80,7 @@ object OneByteSignExt extends Pattern {
   }
 
   override def decompress(in: UInt): UInt = {
-    Cat(Fill(ccEntryBits - width, in(width - 1)), in)
+    Cat(Fill(ccEntryBits - width, in(width - 1)), in(width - 1, 0))
   }
 }
 
@@ -97,7 +97,7 @@ object HalfWordSignExt extends Pattern {
   }
 
   override def decompress(in: UInt): UInt = {
-    Cat(Fill(ccEntryBits - width, in(width - 1)), in)
+    Cat(Fill(ccEntryBits - width, in(width - 1)), in(width - 1, 0))
   }
 }
 
@@ -118,7 +118,7 @@ object PadHalfZero extends Pattern {
   }
 
   override def decompress(in: UInt): UInt = {
-    Cat(in, 0.U(width.W))
+    Cat(in(width - 1, 0), 0.U(width.W))
   }
 }
 
@@ -143,8 +143,8 @@ object TwoSignExt extends Pattern {
   }
 
   override def decompress(in: UInt): UInt = {
-    val num1 = Cat(Fill(quater, in(quater - 1)), in(quater - 1, 0))
-    val num2 = Cat(Fill(quater, in(quater + halfEntryBits - 1)), in(quater + halfEntryBits - 1, 0))
+    val num1 = Cat(Fill(quater, in(width / 2 - 1)), in(width / 2 - 1, 0))
+    val num2 = Cat(Fill(quater, in(width - 1)), in(width - 1, width / 2))
     Cat(num2, num1)
   }
 }
@@ -169,7 +169,7 @@ object RepeatedBytes extends Pattern {
   }
 
   override def decompress(in: UInt): UInt = {
-    Fill(repeat_num, in)
+    Fill(repeat_num, in(width - 1, 0))
   }
 }
 

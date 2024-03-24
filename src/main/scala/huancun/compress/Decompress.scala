@@ -88,7 +88,7 @@ class DecompressUnit(implicit p: Parameters) extends HuanCunModule with CCParame
       offset := sum
       sum +& width
   }
-  val (prefixOHLow, prefixOHHigh) = prefixOH.splitAt(entry_per_beat)
+  val (prefixOHLow, prefixOHHigh) = s1_prefixOH.splitAt(entry_per_beat)
 
   s2_ready := s2_valid & s3_ready | ~s2_valid
   when (s2_ready) {
@@ -123,13 +123,13 @@ class DecompressUnit(implicit p: Parameters) extends HuanCunModule with CCParame
   }
 
   s4_ready := s4_valid & io.out.ready | ~s4_valid
-  when (io.out.ready) {
+  when (s4_ready) {
     s4_valid := s3_valid
   }
   val s4_fire = s4_ready & s3_valid
   val s4_data = RegEnable(VecInit(entryData), s4_fire)
 
-  io.out.bits.beat := Cat(s4_data)
+  io.out.bits.beat := Cat(s4_data.reverse)
   io.out.valid := s4_valid
 }
 
