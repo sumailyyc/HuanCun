@@ -42,13 +42,6 @@ class SinkA(implicit p: Parameters) extends HuanCunModule {
   // TODO: Does task for SinkA necessary?
   io.task.ready := false.B
 
-  val compress = Module(new CompressUnit)
-  compress.io := DontCare
-  dontTouch(compress.io)
-  val decompress = Module(new DecompressUnit)
-  decompress.io := DontCare
-  dontTouch(decompress.io)
-
   val a = io.a
   val (first, last, done, count) = edgeIn.count(a)
   val hasData = edgeIn.hasData(a.bits)
