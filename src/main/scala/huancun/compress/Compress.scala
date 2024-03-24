@@ -155,7 +155,7 @@ class CompressUnit(debug: Boolean = false)(implicit p: Parameters) extends HuanC
     when(s1.first) {
       s2.halfWid := halfWidth
     }.elsewhen(s1.last) {
-      s2.compressible := (s2.halfWid +& halfWidth) < (beatBytes * 8 - ccPrefixBits).U
+      s2.compressible := (s2.halfWid +& halfWidth) <= (beatBytes * 8 - ccPrefixBits).U
     }
   }
 
